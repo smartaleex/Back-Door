@@ -1,0 +1,199 @@
+// Back Door — jewellery & garment cost/SKU manager
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum MaterialType {
+  CHAIN
+  FINDING // pins, lobster claws, bead pins, clasps, etc.
+  BEAD
+  FABRIC // for hats / garments
+  OTHER
+}
+
+enum MetalOption {
+  GOLD_316L
+  STAINLESS_316
+  NOT_APPLICABLE
+}
+
+enum Unit {
+  CM
+  MM
+  EACH
+  GRAM
+  METER
+}
+
+// Which entity a custom field attaches to.
+enum CustomFieldEntity {
+  MATERIAL
+  PRODUCT
+  SUPPLIER
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  SELECT
+  DATE
+}
+
+// ---------------------------------------------------------------------------
+// Suppliers
+// ---------------------------------------------------------------------------
+
+model Supplier {
+  id           String   @id @default(cuid())
+  name         String
+  contactName  String?
+  email        String?
+  phone        String?
+  website      String?
+  notes        String?
+  attributes   Json     @default("{}") // custom fields land here
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  materialLinks MaterialSupplier[]
+}
+
+// Join table: a material can be sourced from multiple suppliers at
+// different prices / lead times. One is marked preferred for default costing.
+model MaterialSupplier {
+  id           String   @id @default(cuid())
+  materialId   String
+  supplierId   String
+  costPerUnit  Decimal  @db.Decimal(12, 4)
+  leadTimeDays Int?
+  minOrderQty  Decimal? @db.Decimal(12, 4)
+  supplierSku  String?
+  isPreferred  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@unique([materialId, supplierId])
+}
+
+// ---------------------------------------------------------------------------
+// Materials (raw components used to build products)
+// ---------------------------------------------------------------------------
+
+model Material {
+  id          String       @id @default(cuid())
+  sku         String       @unique
+  name        String
+  type        MaterialType
+  metal       MetalOption  @default(NOT_APPLICABLE)
+  unit        Unit
+  costPerUnit Decimal      @db.Decimal(12, 4) // default/fallback cost, used when no preferred supplier link exists
+  stockOnHand Decimal?     @db.Decimal(12, 4) // phase 2: inventory tracking
+  reorderAt   Decimal?     @db.Decimal(12, 4) // phase 2: inventory goals
+
+  // Type-specific attributes, kept flexible on purpose:
+  // CHAIN: { linkLengthMm: number }
+  // BEAD: { beadMaterial: "GLASS"|"PEARL"|"OPAL", diameterMm: number, shape: "CIRCLE"|"MARQUISE", colour: string, colourSecondary?: string }
+  // FABRIC: { weight: string, colour: string }
+  attributes  Json         @default("{}")
+
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  suppliers    MaterialSupplier[]
+  recipeItems  RecipeItem[]
+}
+
+// ---------------------------------------------------------------------------
+// Product categories (bracelets, hats, garments, ...) — kept as a simple
+// editable lookup table rather than a hardcoded enum, since new categories
+// (hats, garments) get added over time.
+// ---------------------------------------------------------------------------
+
+model ProductCategory {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+
+  products    Product[]
+}
+
+// ---------------------------------------------------------------------------
+// Products / SKUs
+// ---------------------------------------------------------------------------
+
+model Product {
+  id            String   @id @default(cuid())
+  sku           String   @unique
+  name          String
+  categoryId    String
+  description   String?
+  imageUrl      String?
+
+  laborCost     Decimal  @default(0) @db.Decimal(12, 4)
+  overheadCost  Decimal  @default(0) @db.Decimal(12, 4)
+  retailPrice   Decimal  @default(0) @db.Decimal(12, 4)
+
+  // Category-specific attributes kept flexible, e.g. hats: { style, material, slogan }
+  attributes    Json     @default("{}")
+
+  inventoryGoal Decimal? @db.Decimal(12, 4) // phase 2
+  stockOnHand   Decimal? @db.Decimal(12, 4) // phase 2
+
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category    ProductCategory @relation(fields: [categoryId], references: [id])
+  recipeItems RecipeItem[]
+}
+
+// Bill of materials line: how much of a material a product needs.
+model RecipeItem {
+  id         String   @id @default(cuid())
+  productId  String
+  materialId String
+  quantity   Decimal  @db.Decimal(12, 4)
+  notes      String?
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id])
+
+  @@unique([productId, materialId])
+}
+
+// ---------------------------------------------------------------------------
+// Custom fields — lets the store owner add ad-hoc fields from the UI
+// without a schema migration. Values are stored in the `attributes` Json
+// column of the relevant entity, keyed by `fieldKey`.
+// ---------------------------------------------------------------------------
+
+model CustomFieldDefinition {
+  id         String            @id @default(cuid())
+  entity     CustomFieldEntity
+  fieldKey   String
+  label      String
+  fieldType  CustomFieldType   @default(TEXT)
+  options    Json?             // for SELECT type: string[]
+  isRequired Boolean           @default(false)
+  sortOrder  Int               @default(0)
+  createdAt  DateTime          @default(now())
+
+  @@unique([entity, fieldKey])
+}
