@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { PageHeader, buttonClass, EmptyState, formatCurrency } from "@/components/ui";
+import { PageHeader, buttonClass, EmptyState, formatUnitCost, formatQuantity } from "@/components/ui";
 import { effectiveMaterialCost } from "@/lib/costing";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +61,7 @@ export default async function MaterialsPage({
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Metal</th>
+                <th className="px-4 py-3">Stock</th>
                 <th className="px-4 py-3">Unit cost</th>
                 <th className="px-4 py-3">Preferred supplier</th>
                 <th className="px-4 py-3"></th>
@@ -80,7 +81,16 @@ export default async function MaterialsPage({
                     <td className="px-4 py-3">{m.type}</td>
                     <td className="px-4 py-3">{m.metal === "NOT_APPLICABLE" ? "—" : m.metal.replace("_", " ")}</td>
                     <td className="px-4 py-3">
-                      {formatCurrency(cost)} / {m.unit}
+                      {m.stockOnHand == null ? (
+                        <span className="text-foreground/40">not tracked</span>
+                      ) : (
+                        <span className={m.reorderAt != null && Number(m.stockOnHand) <= Number(m.reorderAt) ? "text-amber-600 dark:text-amber-400" : ""}>
+                          {formatQuantity(Number(m.stockOnHand))} {m.unit}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {formatUnitCost(cost)} / {m.unit}
                     </td>
                     <td className="px-4 py-3 text-foreground/60">{preferred?.supplier.name ?? "—"}</td>
                     <td className="px-4 py-3 text-right">

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { PageHeader, Card, StatCard, inputClass, labelClass, buttonClass, secondaryButtonClass, formatCurrency } from "@/components/ui";
+import { PageHeader, Card, StatCard, inputClass, labelClass, buttonClass, secondaryButtonClass, formatCurrency, formatUnitCost, formatQuantity } from "@/components/ui";
 import { getBulkRequirements } from "@/lib/costing";
 
 export default async function ProductCalculatorPage({
@@ -73,20 +73,20 @@ export default async function ProductCalculatorPage({
                       {m.materialName} <span className="text-xs text-foreground/50">({m.materialSku})</span>
                     </td>
                     <td className="py-2">
-                      {m.quantityPerUnit} {m.unit}
+                      {formatQuantity(m.quantityPerUnit)} {m.unit}
                     </td>
                     <td className="py-2">
-                      {m.totalQuantityNeeded} {m.unit}
+                      {formatQuantity(m.totalQuantityNeeded)} {m.unit}
                     </td>
-                    <td className="py-2">{formatCurrency(m.unitCost)}</td>
+                    <td className="py-2">{formatUnitCost(m.unitCost)}</td>
                     <td className="py-2">{formatCurrency(m.totalCost)}</td>
                     <td className="py-2">
                       {m.stockOnHand === null ? (
                         <span className="text-foreground/40">not tracked</span>
                       ) : m.shortfall !== null && m.shortfall > 0 ? (
-                        <span className="text-red-600 dark:text-red-400">short {m.shortfall}</span>
+                        <span className="text-red-600 dark:text-red-400">short {formatQuantity(m.shortfall)}</span>
                       ) : (
-                        <span className="text-emerald-600 dark:text-emerald-400">OK ({m.stockOnHand})</span>
+                        <span className="text-emerald-600 dark:text-emerald-400">OK ({formatQuantity(m.stockOnHand)})</span>
                       )}
                     </td>
                   </tr>

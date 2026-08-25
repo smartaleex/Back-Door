@@ -183,3 +183,67 @@ export async function getBulkRequirements(productId: string, targetQuantity: num
     costPerUnit: grandTotalCost.dividedBy(qtyDecimal).toNumber(),
   };
 }
+
+export interface MaxBuildableLine {
+  materialId: string;
+  materialName: string;
+  materialSku: string;
+  unit: string;
+  quantityPerUnit: number;
+  stockOnHand: number | null;
+  maxFromThis: number | null; // how many units this material alone allows; null if stock isn't tracked
+}
+
+export interface MaxBuildableResult {
+  productId: string;
+  maxBuildable: number | null; // null when the recipe is empty or no ingredient has stock tracked
+  limitingMaterialId: string | null;
+  hasUntrackedMaterial: boolean; // true if at least one ingredient has no stock figure, so maxBuildable may be optimistic
+  lines: MaxBuildableLine[];
+}
+
+/**
+ * Given a product's current recipe and each ingredient's stockOnHand, work
+ * out roughly how many units could be built right now — limited by
+ * whichever material runs out first. Distinct from getBulkRequirements,
+ * which answers "what would N units cost", not "how many can I make now".
+ */
+export async function getMaxBuildable(productId: string): Promise<MaxBuildableResult> {
+  const product = await prisma.product.findUniqueOrThrow({
+    where: { id: productId },
+    include: { recipeItems: { include: { material: true } } },
+  });
+
+  let maxBuildable: number | null = null;
+  let limitingMaterialId: string | null = null;
+  let hasUntrackedMaterial = false;
+  const lines: MaxBuildableLine[] = [];
+
+  for (const item of product.recipeItems) {
+    const qty = toDecimal(item.quantity);
+    const stock = item.material.stockOnHand != null ? toDecimal(item.material.stockOnHand) : null;
+    let maxFromThis: number | null = null;
+
+    if (stock === null) {
+      hasUntrackedMaterial = true;
+    } else if (!qty.isZero()) {
+      maxFromThis = Math.floor(stock.dividedBy(qty).toNumber());
+      if (maxBuildable === null || maxFromThis < maxBuildable) {
+        maxBuildable = maxFromThis;
+        limitingMaterialId = item.materialId;
+      }
+    }
+
+    lines.push({
+      materialId: item.materialId,
+      materialName: item.material.name,
+      materialSku: item.material.sku,
+      unit: item.material.unit,
+      quantityPerUnit: qty.toNumber(),
+      stockOnHand: stock ? stock.toNumber() : null,
+      maxFromThis,
+    });
+  }
+
+  return { productId, maxBuildable, limitingMaterialId, hasUntrackedMaterial, lines };
+}

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { PageHeader, Card, secondaryButtonClass, dangerButtonClass, inputClass, labelClass, formatCurrency } from "@/components/ui";
+import { PageHeader, Card, secondaryButtonClass, dangerButtonClass, inputClass, labelClass, formatUnitCost } from "@/components/ui";
 import { MaterialForm } from "@/components/materials/MaterialForm";
 import { updateMaterial, deleteMaterial, addMaterialSupplier, removeMaterialSupplier } from "@/app/materials/actions";
 import { getCustomFieldDefs, CustomFieldEntity } from "@/lib/customFields";
@@ -64,7 +64,7 @@ export default async function EditMaterialPage({ params }: { params: Promise<{ i
                 <div>
                   <span className="font-medium">{link.supplier.name}</span>{" "}
                   <span className="text-foreground/60">
-                    — {formatCurrency(Number(link.costPerUnit))} / {material.unit}
+                    — {formatUnitCost(Number(link.costPerUnit))} / {material.unit}
                     {link.leadTimeDays ? `, ${link.leadTimeDays}d lead time` : ""}
                   </span>
                   {link.isPreferred ? (

@@ -11,22 +11,24 @@ import {
   secondaryButtonClass,
   dangerButtonClass,
   formatCurrency,
+  formatUnitCost,
   formatPercent,
 } from "@/components/ui";
 import { ProductForm } from "@/components/products/ProductForm";
 import { updateProduct, deleteProduct, addRecipeItem, updateRecipeItemQuantity, removeRecipeItem } from "@/app/products/actions";
 import { getCustomFieldDefs, CustomFieldEntity } from "@/lib/customFields";
-import { getProductCostBreakdown } from "@/lib/costing";
+import { getProductCostBreakdown, getMaxBuildable } from "@/lib/costing";
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [product, categories, customFieldDefs, materials, cost] = await Promise.all([
+  const [product, categories, customFieldDefs, materials, cost, buildable] = await Promise.all([
     prisma.product.findUnique({ where: { id } }),
     prisma.productCategory.findMany({ orderBy: { name: "asc" } }),
     getCustomFieldDefs(CustomFieldEntity.PRODUCT),
     prisma.material.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     getProductCostBreakdown(id),
+    getMaxBuildable(id),
   ]);
 
   if (!product) notFound();
@@ -76,11 +78,22 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
       <div>
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-foreground/60">Cost summary</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
           <StatCard label="Material cost" value={formatCurrency(cost.materialCost)} />
           <StatCard label="Total cost" value={formatCurrency(cost.totalCost)} hint="material + labour + overhead" />
           <StatCard label="Profit / unit" value={formatCurrency(cost.profit)} />
           <StatCard label="Margin" value={formatPercent(cost.marginPct)} />
+          <StatCard
+            label="Buildable now"
+            value={buildable.maxBuildable === null ? (buildable.lines.length === 0 ? "—" : "not tracked") : `${buildable.hasUntrackedMaterial ? "~" : ""}${buildable.maxBuildable}`}
+            hint={
+              buildable.limitingMaterialId
+                ? `limited by ${buildable.lines.find((l) => l.materialId === buildable.limitingMaterialId)?.materialName}`
+                : buildable.hasUntrackedMaterial
+                  ? "some materials not tracked"
+                  : undefined
+            }
+          />
         </div>
       </div>
 
@@ -97,11 +110,15 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
                 <th className="py-2">Qty</th>
                 <th className="py-2">Unit cost</th>
                 <th className="py-2">Line cost</th>
+                <th className="py-2">Max from stock</th>
                 <th className="py-2"></th>
               </tr>
             </thead>
             <tbody>
-              {cost.lines.map((line) => (
+              {cost.lines.map((line) => {
+                const buildLine = buildable.lines.find((l) => l.materialId === line.materialId);
+                const isLimiting = buildable.limitingMaterialId === line.materialId;
+                return (
                 <tr key={line.recipeItemId} className="border-t border-black/10 dark:border-white/10">
                   <td className="py-2">
                     {line.materialName} <span className="text-xs text-foreground/50">({line.materialSku})</span>
@@ -122,8 +139,18 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
                       </button>
                     </form>
                   </td>
-                  <td className="py-2">{formatCurrency(line.unitCost)}</td>
+                  <td className="py-2">{formatUnitCost(line.unitCost)}</td>
                   <td className="py-2">{formatCurrency(line.lineCost)}</td>
+                  <td className="py-2">
+                    {buildLine?.maxFromThis == null ? (
+                      <span className="text-foreground/40">not tracked</span>
+                    ) : (
+                      <span className={isLimiting ? "font-medium text-amber-600 dark:text-amber-400" : ""}>
+                        {buildLine.maxFromThis}
+                        {isLimiting ? " ←" : ""}
+                      </span>
+                    )}
+                  </td>
                   <td className="py-2 text-right">
                     <form action={removeRecipeItem.bind(null, id, line.recipeItemId)}>
                       <button type="submit" className="text-xs text-red-600 underline underline-offset-4 dark:text-red-400">
@@ -132,7 +159,8 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
                     </form>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}

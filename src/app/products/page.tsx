@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, buttonClass, secondaryButtonClass, EmptyState, formatCurrency, formatPercent } from "@/components/ui";
-import { getProductCostBreakdown } from "@/lib/costing";
+import { getProductCostBreakdown, getMaxBuildable } from "@/lib/costing";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,8 @@ export default async function ProductsPage() {
   });
 
   const breakdowns = await Promise.all(products.map((p) => getProductCostBreakdown(p.id)));
-  const rows = products.map((p, i) => ({ product: p, cost: breakdowns[i] }));
+  const buildables = await Promise.all(products.map((p) => getMaxBuildable(p.id)));
+  const rows = products.map((p, i) => ({ product: p, cost: breakdowns[i], buildable: buildables[i] }));
 
   return (
     <div>
@@ -44,11 +45,12 @@ export default async function ProductsPage() {
                 <th className="px-4 py-3">Cost</th>
                 <th className="px-4 py-3">Retail</th>
                 <th className="px-4 py-3">Margin</th>
+                <th className="px-4 py-3">Buildable now</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ product, cost }) => (
+              {rows.map(({ product, cost, buildable }) => (
                 <tr key={product.id} className="border-t border-black/10 dark:border-white/10">
                   <td className="px-4 py-3 font-mono text-xs">{product.sku}</td>
                   <td className="px-4 py-3">
@@ -72,6 +74,19 @@ export default async function ProductsPage() {
                     >
                       {formatPercent(cost.marginPct)}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {buildable.maxBuildable === null ? (
+                      <span className="text-foreground/40">{buildable.lines.length === 0 ? "no recipe" : "not tracked"}</span>
+                    ) : (
+                      <span
+                        className={buildable.maxBuildable === 0 ? "text-red-600 dark:text-red-400" : ""}
+                        title={buildable.hasUntrackedMaterial ? "Approximate — one or more ingredients don't have stock tracked yet" : undefined}
+                      >
+                        {buildable.hasUntrackedMaterial ? "~" : ""}
+                        {buildable.maxBuildable}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link href={`/products/${product.id}/edit`} className="text-sm font-medium underline underline-offset-4">

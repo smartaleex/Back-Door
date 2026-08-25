@@ -70,6 +70,22 @@ export function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(value);
 }
 
+// For per-unit costs, which are often sub-cent (e.g. $0.006/cm of chain) —
+// formatCurrency's fixed 2 decimals would round that to a misleading $0.01.
+export function formatUnitCost(value: number) {
+  const digits = Math.abs(value) > 0 && Math.abs(value) < 1 ? 4 : 2;
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
+}
+
+export function formatQuantity(value: number) {
+  return new Intl.NumberFormat("en-AU", { maximumFractionDigits: 2 }).format(value);
+}
+
 export function formatPercent(value: number | null) {
   if (value === null) return "—";
   return `${value.toFixed(1)}%`;
