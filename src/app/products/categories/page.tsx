@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { PageHeader, Card, inputClass, labelClass, buttonClass, dangerButtonClass } from "@/components/ui";
-import { createCategory, deleteCategory } from "@/app/products/actions";
+import { createCategory, deleteCategory, updateCategoryRoles } from "@/app/products/actions";
+import { CategoryRolesEditor } from "@/components/products/CategoryRolesEditor";
+import { parseRecipeRoles } from "@/lib/recipeRoles";
 
 export const dynamic = "force-dynamic";
 
@@ -12,24 +14,32 @@ export default async function CategoriesPage() {
 
   return (
     <div className="max-w-2xl space-y-8">
-      <PageHeader title="Product categories" description="Bracelets, hats, garments — add as many as you need." />
+      <PageHeader
+        title="Product categories"
+        description="Bracelets, hats, garments — add as many as you need. Optionally define bill-of-materials slots for each so the new-product form shows labeled component pickers instead of a generic list."
+      />
 
       <Card>
         <ul className="mb-4 divide-y divide-black/10 dark:divide-white/10">
           {categories.map((c) => (
-            <li key={c.id} className="flex items-center justify-between py-3">
+            <li key={c.id} className="py-3">
               <div>
-                <p className="font-medium">{c.name}</p>
-                {c.description ? <p className="text-sm text-foreground/60">{c.description}</p> : null}
-                <p className="text-xs text-foreground/50">{c._count.products} product(s)</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{c.name}</p>
+                    {c.description ? <p className="text-sm text-foreground/60">{c.description}</p> : null}
+                    <p className="text-xs text-foreground/50">{c._count.products} product(s)</p>
+                  </div>
+                  {c._count.products === 0 ? (
+                    <form action={deleteCategory.bind(null, c.id)}>
+                      <button type="submit" className={dangerButtonClass}>
+                        Delete
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+                <CategoryRolesEditor action={updateCategoryRoles.bind(null, c.id)} initialRoles={parseRecipeRoles(c.recipeRoles)} />
               </div>
-              {c._count.products === 0 ? (
-                <form action={deleteCategory.bind(null, c.id)}>
-                  <button type="submit" className={dangerButtonClass}>
-                    Delete
-                  </button>
-                </form>
-              ) : null}
             </li>
           ))}
         </ul>

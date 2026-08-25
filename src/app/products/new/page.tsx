@@ -3,6 +3,7 @@ import { PageHeader, EmptyState } from "@/components/ui";
 import { NewProductForm, type MaterialOption } from "@/components/products/NewProductForm";
 import { createProductWithRecipe } from "@/app/products/actions";
 import { getCustomFieldDefs, CustomFieldEntity } from "@/lib/customFields";
+import { parseRecipeRoles, type RecipeRole } from "@/lib/recipeRoles";
 
 export default async function NewProductPage() {
   const [categories, customFieldDefs, materials, productCountsByCategory] = await Promise.all([
@@ -35,6 +36,9 @@ export default async function NewProductPage() {
 
   const countByCategory = new Map(productCountsByCategory.map((c) => [c.categoryId, c._count._all]));
   const nextSequenceByCategory = Object.fromEntries(categories.map((c) => [c.id, (countByCategory.get(c.id) ?? 0) + 1]));
+  const categoryRoles: Record<string, RecipeRole[]> = Object.fromEntries(
+    categories.map((c) => [c.id, parseRecipeRoles(c.recipeRoles)]),
+  );
 
   return (
     <div className="max-w-3xl">
@@ -45,6 +49,7 @@ export default async function NewProductPage() {
         materials={materialOptions}
         customFieldDefs={customFieldDefs}
         nextSequenceByCategory={nextSequenceByCategory}
+        categoryRoles={categoryRoles}
       />
     </div>
   );

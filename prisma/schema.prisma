@@ -129,6 +129,11 @@ model ProductCategory {
   id          String    @id @default(cuid())
   name        String    @unique
   description String?
+  // Self-service bill-of-materials slots for this category, e.g. Bracelet:
+  // [{key,label:"Chain",materialType:"CHAIN"}, {label:"Bead",materialType:"BEAD"}].
+  // Null/empty means "no fixed slots" — the recipe builder falls back to a
+  // generic add-any-material flow. materialType is optional (null = any type).
+  recipeRoles Json?
   createdAt   DateTime  @default(now())
 
   products    Product[]

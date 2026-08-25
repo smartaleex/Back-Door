@@ -164,3 +164,23 @@ export async function deleteCategory(id: string) {
   await prisma.productCategory.delete({ where: { id } });
   revalidatePath("/products/categories");
 }
+
+export async function updateCategoryRoles(categoryId: string, formData: FormData) {
+  let roles: unknown = [];
+  try {
+    roles = JSON.parse(String(formData.get("rolesJson") || "[]"));
+  } catch {
+    roles = [];
+  }
+  const cleaned = Array.isArray(roles)
+    ? roles.filter((r) => r && typeof r === "object" && typeof r.key === "string" && typeof r.label === "string" && r.label.trim() !== "")
+    : [];
+
+  await prisma.productCategory.update({
+    where: { id: categoryId },
+    data: { recipeRoles: cleaned as Prisma.InputJsonValue },
+  });
+
+  revalidatePath("/products/categories");
+  revalidatePath("/products/new");
+}

@@ -7,6 +7,7 @@ import { CustomFieldsFieldset } from "@/components/CustomFieldsFieldset";
 import { CustomFieldType } from "@/generated/prisma/enums";
 import { suggestProductSku, type MaterialForSku } from "@/lib/skuSuggestion";
 import { MATERIAL_TYPE_ORDER, MATERIAL_TYPE_LABELS } from "@/lib/materialTypes";
+import type { RecipeRole } from "@/lib/recipeRoles";
 
 type Def = {
   id: string;
@@ -36,26 +37,35 @@ function nextRowKey() {
   return `row-${rowKeySeq}`;
 }
 
+type RecipeRow = { key: string; materialId: string; quantity: number; roleLabel?: string; filterType?: string | null };
+
+function rowsFromRoles(roles: RecipeRole[]): RecipeRow[] {
+  return roles.map((r) => ({ key: nextRowKey(), materialId: "", quantity: 1, roleLabel: r.label, filterType: r.materialType }));
+}
+
 export function NewProductForm({
   action,
   categories,
   materials,
   customFieldDefs,
   nextSequenceByCategory,
+  categoryRoles,
 }: {
   action: (formData: FormData) => void;
   categories: Category[];
   materials: MaterialOption[];
   customFieldDefs: Def[];
   nextSequenceByCategory: Record<string, number>;
+  categoryRoles: Record<string, RecipeRole[]>;
 }) {
-  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
+  const initialCategoryId = categories[0]?.id ?? "";
+  const [categoryId, setCategoryId] = useState(initialCategoryId);
   const [sku, setSku] = useState("");
   const [skuTouched, setSkuTouched] = useState(false);
   const [laborCost, setLaborCost] = useState(0);
   const [overheadCost, setOverheadCost] = useState(0);
   const [retailPrice, setRetailPrice] = useState(0);
-  const [rows, setRows] = useState<{ key: string; materialId: string; quantity: number }[]>([]);
+  const [rows, setRows] = useState<RecipeRow[]>(() => rowsFromRoles(categoryRoles[initialCategoryId] ?? []));
 
   const materialsByType = useMemo(() => {
     const groups: Record<string, MaterialOption[]> = {};
@@ -99,7 +109,12 @@ export function NewProductForm({
 
   function handleCategoryChange(id: string) {
     setCategoryId(id);
-    recomputeSku(rows, id);
+    // Only auto-populate role slots if nothing's been picked yet, so
+    // switching categories never wipes out work already in progress.
+    const nothingChosen = rows.every((r) => !r.materialId);
+    const nextRows = nothingChosen ? rowsFromRoles(categoryRoles[id] ?? []) : rows;
+    if (nextRows !== rows) setRows(nextRows);
+    recomputeSku(nextRows, id);
   }
 
   const preview = useMemo(() => {
@@ -235,17 +250,18 @@ export function NewProductForm({
           <div className="space-y-2">
             {rows.map((row) => {
               const material = materials.find((m) => m.id === row.materialId);
+              const typesToShow = row.filterType ? [row.filterType] : MATERIAL_TYPE_ORDER;
               return (
                 <div key={row.key} className="grid grid-cols-[1fr_auto_auto] items-end gap-2 sm:grid-cols-[2fr_1fr_auto_auto]">
                   <div>
-                    <label className={labelClass}>Material</label>
+                    <label className={labelClass}>{row.roleLabel ?? "Material"}</label>
                     <select
                       value={row.materialId}
                       onChange={(e) => setRowMaterial(row.key, e.target.value)}
                       className={inputClass}
                     >
                       <option value="">Select…</option>
-                      {MATERIAL_TYPE_ORDER.map((type) =>
+                      {typesToShow.map((type) =>
                         materialsByType[type]?.length ? (
                           <optgroup key={type} label={MATERIAL_TYPE_LABELS[type] ?? type}>
                             {materialsByType[type].map((m) => (
