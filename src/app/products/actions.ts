@@ -44,6 +44,60 @@ export async function createProduct(formData: FormData) {
   redirect(`/products/${product.id}/edit`);
 }
 
+interface RecipeRowInput {
+  materialId: string;
+  quantity: number;
+}
+
+/**
+ * Creates a product and its full recipe in one submit, instead of the
+ * create-then-add-ingredients-one-at-a-time flow. `recipeJson` is a
+ * client-built JSON array of { materialId, quantity } assembled by the
+ * live recipe builder on the new-product form.
+ */
+export async function createProductWithRecipe(formData: FormData) {
+  const attributes = await buildAttributes(formData);
+
+  let recipeRows: RecipeRowInput[] = [];
+  try {
+    const parsed = JSON.parse(String(formData.get("recipeJson") || "[]"));
+    if (Array.isArray(parsed)) recipeRows = parsed;
+  } catch {
+    recipeRows = [];
+  }
+  const validRows = recipeRows.filter(
+    (r) => r && typeof r.materialId === "string" && r.materialId.length > 0 && Number.isFinite(r.quantity) && r.quantity > 0,
+  );
+
+  const product = await prisma.$transaction(async (tx) => {
+    const created = await tx.product.create({
+      data: {
+        sku: String(formData.get("sku")).trim(),
+        name: String(formData.get("name")).trim(),
+        categoryId: String(formData.get("categoryId")),
+        description: str(formData, "description"),
+        imageUrl: str(formData, "imageUrl"),
+        laborCost: num(formData, "laborCost"),
+        overheadCost: num(formData, "overheadCost"),
+        retailPrice: num(formData, "retailPrice"),
+        isActive: formData.get("isActive") === "on",
+        attributes,
+      },
+    });
+
+    if (validRows.length > 0) {
+      await tx.recipeItem.createMany({
+        data: validRows.map((r) => ({ productId: created.id, materialId: r.materialId, quantity: r.quantity })),
+      });
+    }
+
+    return created;
+  });
+
+  revalidatePath("/products");
+  redirect(`/products/${product.id}/edit`);
+}
+
 export async function updateProduct(id: string, formData: FormData) {
   const attributes = await buildAttributes(formData);
 

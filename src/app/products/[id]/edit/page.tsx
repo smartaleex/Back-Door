@@ -18,6 +18,7 @@ import { ProductForm } from "@/components/products/ProductForm";
 import { updateProduct, deleteProduct, addRecipeItem, updateRecipeItemQuantity, removeRecipeItem } from "@/app/products/actions";
 import { getCustomFieldDefs, CustomFieldEntity } from "@/lib/customFields";
 import { getProductCostBreakdown, getMaxBuildable } from "@/lib/costing";
+import { MATERIAL_TYPE_ORDER, MATERIAL_TYPE_LABELS } from "@/lib/materialTypes";
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -178,11 +179,19 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
             <div className="col-span-2 sm:col-span-2">
               <label className={labelClass}>Material</label>
               <select name="materialId" required className={inputClass}>
-                {availableMaterials.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name} ({m.sku})
-                  </option>
-                ))}
+                {MATERIAL_TYPE_ORDER.map((type) => {
+                  const group = availableMaterials.filter((m) => m.type === type);
+                  if (group.length === 0) return null;
+                  return (
+                    <optgroup key={type} label={MATERIAL_TYPE_LABELS[type] ?? type}>
+                      {group.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} ({m.sku})
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
               </select>
             </div>
             <div>
