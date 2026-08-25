@@ -2,14 +2,19 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, buttonClass, secondaryButtonClass, EmptyState, formatCurrency, formatPercent } from "@/components/ui";
 import { getProductCostBreakdown, getMaxBuildable } from "@/lib/costing";
+import { getCustomFieldDefs, CustomFieldEntity } from "@/lib/customFields";
+import { getCustomValues, formatCustomFieldValue } from "@/lib/customFieldValues";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProductsPage() {
-  const products = await prisma.product.findMany({
-    include: { category: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const [products, customFieldDefs] = await Promise.all([
+    prisma.product.findMany({
+      include: { category: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    getCustomFieldDefs(CustomFieldEntity.PRODUCT),
+  ]);
 
   const breakdowns = await Promise.all(products.map((p) => getProductCostBreakdown(p.id)));
   const buildables = await Promise.all(products.map((p) => getMaxBuildable(p.id)));
@@ -46,11 +51,18 @@ export default async function ProductsPage() {
                 <th className="px-4 py-3">Retail</th>
                 <th className="px-4 py-3">Margin</th>
                 <th className="px-4 py-3">Buildable now</th>
+                {customFieldDefs.map((def) => (
+                  <th key={def.id} className="px-4 py-3">
+                    {def.label}
+                  </th>
+                ))}
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ product, cost, buildable }) => (
+              {rows.map(({ product, cost, buildable }) => {
+                const customValues = getCustomValues(product.attributes);
+                return (
                 <tr key={product.id} className="border-t border-black/10 dark:border-white/10">
                   <td className="px-4 py-3 font-mono text-xs">{product.sku}</td>
                   <td className="px-4 py-3">
@@ -88,13 +100,19 @@ export default async function ProductsPage() {
                       </span>
                     )}
                   </td>
+                  {customFieldDefs.map((def) => (
+                    <td key={def.id} className="px-4 py-3 text-foreground/60">
+                      {formatCustomFieldValue(customValues[def.fieldKey], def.fieldType)}
+                    </td>
+                  ))}
                   <td className="px-4 py-3 text-right">
                     <Link href={`/products/${product.id}/edit`} className="text-sm font-medium underline underline-offset-4">
                       Edit
                     </Link>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

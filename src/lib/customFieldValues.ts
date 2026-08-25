@@ -40,3 +40,12 @@ export function getCustomValues(attributes: unknown): Record<string, unknown> {
   }
   return {};
 }
+
+// Renders one custom field's value for a table cell — used on list pages so
+// a field added in Settings → Custom Fields shows up there too, not just in
+// the add/edit forms.
+export function formatCustomFieldValue(value: unknown, fieldType: CustomFieldType): string {
+  if (value === undefined || value === null || value === "") return "—";
+  if (fieldType === "BOOLEAN") return value ? "Yes" : "No";
+  return String(value);
+}

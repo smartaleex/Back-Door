@@ -2,6 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PageHeader, buttonClass, EmptyState, formatUnitCost, formatQuantity } from "@/components/ui";
 import { effectiveMaterialCost } from "@/lib/costing";
+import { getCustomFieldDefs, CustomFieldEntity } from "@/lib/customFields";
+import { getCustomValues, formatCustomFieldValue } from "@/lib/customFieldValues";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +14,14 @@ export default async function MaterialsPage({
 }) {
   const { type } = await searchParams;
 
-  const materials = await prisma.material.findMany({
-    where: type ? { type: type as never } : undefined,
-    include: { suppliers: { include: { supplier: true } } },
-    orderBy: [{ type: "asc" }, { name: "asc" }],
-  });
+  const [materials, customFieldDefs] = await Promise.all([
+    prisma.material.findMany({
+      where: type ? { type: type as never } : undefined,
+      include: { suppliers: { include: { supplier: true } } },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+    }),
+    getCustomFieldDefs(CustomFieldEntity.MATERIAL),
+  ]);
 
   const types = ["CHAIN", "FINDING", "BEAD", "FABRIC", "OTHER"];
 
@@ -64,6 +69,11 @@ export default async function MaterialsPage({
                 <th className="px-4 py-3">Stock</th>
                 <th className="px-4 py-3">Unit cost</th>
                 <th className="px-4 py-3">Preferred supplier</th>
+                {customFieldDefs.map((def) => (
+                  <th key={def.id} className="px-4 py-3">
+                    {def.label}
+                  </th>
+                ))}
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -71,6 +81,7 @@ export default async function MaterialsPage({
               {materials.map((m) => {
                 const cost = effectiveMaterialCost(m).toNumber();
                 const preferred = m.suppliers.find((s) => s.isPreferred);
+                const customValues = getCustomValues(m.attributes);
                 return (
                   <tr key={m.id} className="border-t border-black/10 dark:border-white/10">
                     <td className="px-4 py-3 font-mono text-xs">{m.sku}</td>
@@ -93,6 +104,11 @@ export default async function MaterialsPage({
                       {formatUnitCost(cost)} / {m.unit}
                     </td>
                     <td className="px-4 py-3 text-foreground/60">{preferred?.supplier.name ?? "—"}</td>
+                    {customFieldDefs.map((def) => (
+                      <td key={def.id} className="px-4 py-3 text-foreground/60">
+                        {formatCustomFieldValue(customValues[def.fieldKey], def.fieldType)}
+                      </td>
+                    ))}
                     <td className="px-4 py-3 text-right">
                       <Link href={`/materials/${m.id}/edit`} className="text-sm font-medium underline underline-offset-4">
                         Edit
