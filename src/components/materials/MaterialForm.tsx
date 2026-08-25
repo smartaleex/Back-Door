@@ -115,12 +115,12 @@ export function MaterialForm({
         <div className="space-y-4 border-t border-black/10 pt-4 dark:border-white/10">
           <p className="text-xs font-medium uppercase tracking-wide text-foreground/50">Chain details</p>
           <div className="max-w-xs">
-            <label className={labelClass}>Link length (mm)</label>
+            <label className={labelClass}>Link size</label>
             <input
-              name="linkLengthMm"
-              type="number"
-              step="any"
-              defaultValue={(attrs.linkLengthMm as number) ?? ""}
+              name="linkSize"
+              type="text"
+              placeholder="1.5mm, 9x3mm, 4.2mm paperclip…"
+              defaultValue={(attrs.linkSize as string) ?? ""}
               className={inputClass}
             />
           </div>

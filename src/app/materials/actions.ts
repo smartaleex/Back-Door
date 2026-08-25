@@ -18,8 +18,8 @@ function num(formData: FormData, key: string) {
 
 function buildTypeAttributes(formData: FormData, type: MaterialType) {
   if (type === MaterialType.CHAIN) {
-    const linkLengthMm = num(formData, "linkLengthMm");
-    return linkLengthMm !== null ? { linkLengthMm } : {};
+    const linkSize = str(formData, "linkSize");
+    return linkSize !== null ? { linkSize } : {};
   }
   if (type === MaterialType.BEAD) {
     const beadMaterial = str(formData, "beadMaterial");
